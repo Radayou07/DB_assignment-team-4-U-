@@ -1,19 +1,11 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-
-
-export default function Order() {
-   const [data, setData] = useState("");
-
-  useEffect(() => {
-    axios.get('http://127.0.0.1:5000/api/order')
-      .then(response => setData(response.data.message))
-      .catch(error => console.error("Error fetching data:", error));
-  }, []);
+// src/pages/Order.jsx
+const Orders = () => {
   return (
-    <div>
-      <h1>Orders Page</h1>
-      <p>Order management content will appear here.</p>
+    <div className="p-6">
+      <h1 className="text-[30px] font-bold text-slate-900">Orders Page</h1>
+      <p className="text-slate-500 mt-2">Order management content will appear here.</p>
     </div>
   );
-}
+};
+
+export default Orders;

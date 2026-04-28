@@ -3,10 +3,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import SideNavBar from './components/SideNavBar';
 import TopNavBar from './components/TopNavBar';
 import Dashboard from './pages/Dashboard';
-import Inventory from './pages/Inventory';
-import Orders from './pages/Order';
-import Suppliers from './pages/Suppliers';
-import Analysis from './pages/Analysis';
 
 function App() {
   return (
@@ -17,10 +13,6 @@ function App() {
         <main className="ml-60 pt-16 min-h-screen">
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/suppliers" element={<Suppliers />} />
-            <Route path="/analysis" element={<Analysis />} />
           </Routes>
         </main>
       </div>
