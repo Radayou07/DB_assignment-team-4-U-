@@ -3,12 +3,16 @@ import Modal from '../components/Modal';
 
 function Products() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editId, setEditId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -19,9 +23,18 @@ function Products() {
     category_id: ''
   });
 
+  // Order form state
+  const [orderData, setOrderData] = useState({
+    customer_id: '',
+    quantity: 1,
+    payment_status: 0, // 0 = Pending, 1 = Done
+    payment_method: 'Cash'
+  });
+
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+    fetchCustomers();
   }, []);
 
   const fetchCategories = async () => {
@@ -33,6 +46,18 @@ function Products() {
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/customers');
+      if (response.ok) {
+        const data = await response.json();
+        setCustomers(data);
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
     }
   };
 
@@ -56,6 +81,70 @@ function Products() {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleOrderChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setOrderData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (checked ? 1 : 0) : value
+    }));
+  };
+
+  // Open order modal
+  const handleOrder = (product) => {
+    setSelectedProduct(product);
+    setOrderData({
+      customer_id: '',
+      quantity: 1,
+      payment_status: 0,
+      payment_method: 'Cash'
+    });
+    setIsOrderModalOpen(true);
+  };
+
+  // Submit order
+  const handleOrderSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!orderData.customer_id) {
+      alert('Please select a customer');
+      return;
+    }
+
+    if (orderData.quantity > selectedProduct.product_quantity && orderData.payment_status === 1) {
+      alert('Not enough stock!');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product_id: selectedProduct.id,
+          customer_id: orderData.customer_id,
+          quantity: parseInt(orderData.quantity),
+          price: selectedProduct.price,
+          payment_status: orderData.payment_status,
+          payment_method: orderData.payment_method
+        })
+      });
+
+      if (response.ok) {
+        setIsOrderModalOpen(false);
+        fetchProducts(); // Refresh products to update stock
+        alert('Order created successfully!');
+      } else {
+        const error = await response.json();
+        alert('Error: ' + (error.error || 'Something went wrong'));
+      }
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert('Network error. Please try again.');
+    }
   };
 
   // Reset and open modal for adding
@@ -98,7 +187,7 @@ function Products() {
           method: 'DELETE',
         });
         if (response.ok) {
-          fetchProducts(); // Refresh list
+          fetchProducts();
         } else {
           const error = await response.json();
           console.error('Delete error:', error);
@@ -122,14 +211,6 @@ function Products() {
       category_id: ''
     });
   };
-  // Order product
-  const handleOrder = (product) => {
-    // For now, just log it or you can navigate to orders page
-    console.log('Order product:', product);
-    alert(`Order placed for: ${product.name}`);
-    // Later you can navigate to orders page with this product
-    // navigate('/orders', { state: { product } });
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -140,8 +221,6 @@ function Products() {
         : 'http://localhost:5000/api/products';
       
       const method = isEditMode ? 'PUT' : 'POST';
-      
-      console.log('Submitting to:', url, 'Method:', method, 'Data:', formData);
       
       const response = await fetch(url, {
         method: method,
@@ -177,7 +256,7 @@ function Products() {
       product.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       getCategoryName(product.category_id).toLowerCase().includes(searchTerm.toLowerCase())
     )
-    .sort((a, b) => a.id - b.id); // Sort by ID
+    .sort((a, b) => a.id - b.id);
 
   return (
     <div className="p-6">
@@ -302,12 +381,6 @@ function Products() {
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleOrder(product)}
-                            className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-                          >
-                            Order
-                          </button>
-                          <button
                             onClick={() => handleEdit(product)}
                             className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                           >
@@ -318,6 +391,12 @@ function Products() {
                             className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
                           >
                             Delete
+                          </button>
+                          <button
+                            onClick={() => handleOrder(product)}
+                            className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                          >
+                            Order
                           </button>
                         </div>
                       </td>
@@ -364,7 +443,6 @@ function Products() {
                 value={formData.name}
                 onChange={handleChange}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                placeholder='Ra Dayou'
                 required
               />
             </div>
@@ -395,7 +473,6 @@ function Products() {
                 step="0.01"
                 min="0"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                placeholder='67'
                 required
               />
             </div>
@@ -409,7 +486,6 @@ function Products() {
                 onChange={handleChange}
                 min="0"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                placeholder='168'
                 required
               />
             </div>
@@ -422,7 +498,6 @@ function Products() {
                 value={formData.company}
                 onChange={handleChange}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                placeholder='idk.icm'
               />
             </div>
 
@@ -441,7 +516,7 @@ function Products() {
           <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
             <button 
               type="button"
-              onClick={handleClose}  // ← Use handleClose instead of setIsPanelOpen
+              onClick={handleClose}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               Cancel
@@ -454,6 +529,126 @@ function Products() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Order Modal */}
+      <Modal 
+        isOpen={isOrderModalOpen} 
+        onClose={() => setIsOrderModalOpen(false)}
+        title="Create Order"
+      >
+        {selectedProduct && (
+          <form onSubmit={handleOrderSubmit}>
+            {/* Product Info */}
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <div className="flex items-center gap-3">
+                <img 
+                  src={selectedProduct.image || 'https://via.placeholder.com/40'} 
+                  alt={selectedProduct.name}
+                  className="w-12 h-12 rounded-lg object-cover"
+                />
+                <div>
+                  <h3 className="font-semibold">{selectedProduct.name}</h3>
+                  <p className="text-sm text-gray-600">
+                    Available: {selectedProduct.product_quantity} | Price: ${selectedProduct.price}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Customer Select */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Customer *</label>
+                <select
+                  name="customer_id"
+                  value={orderData.customer_id}
+                  onChange={handleOrderChange}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                >
+                  <option value="">Select customer</option>
+                  {customers.map(customer => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name} - {customer.number}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+                <input 
+                  type="number"
+                  name="quantity"
+                  value={orderData.quantity}
+                  onChange={handleOrderChange}
+                  min="1"
+                  max={selectedProduct.product_quantity}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Total: ${(selectedProduct.price * orderData.quantity).toFixed(2)}
+                </p>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                <select
+                  name="payment_method"
+                  value={orderData.payment_method}
+                  onChange={handleOrderChange}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="Credit Card">Credit Card</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Mobile Payment">Mobile Payment</option>
+                </select>
+              </div>
+
+              {/* Payment Status */}
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="payment_status"
+                    checked={orderData.payment_status === 1}
+                    onChange={handleOrderChange}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Payment Done
+                  </span>
+                </label>
+                {orderData.payment_status === 1 && (
+                  <span className="text-xs text-red-500">
+                    ⚠️ Stock will be deducted
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+              <button 
+                type="button"
+                onClick={() => setIsOrderModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+              >
+                Place Order
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );
